@@ -148,7 +148,7 @@ void *API_createResult(int columns)
 void API_resultSetField(void *result, int column, UMTypeInfo *ti, void *_name, size_t _cbName)
 {
   PyObject *field = PyTuple_New(2);
-  PyTuple_SET_ITEM(field, 0, PyUnicode_FromStringAndSize((const char *)_name, _cbName));
+  PyTuple_SET_ITEM(field, 0, PyBytes_FromStringAndSize((const char *)_name, _cbName));
   PyTuple_SET_ITEM(field, 1, PyLong_FromLong(ti->type));
   PyTuple_SET_ITEM(((ResultSet *) result)->fields, column, field);
   PRINTMARK();
@@ -508,7 +508,7 @@ static PyObject *DecodeString (UMTypeInfo *ti, char *value, size_t cbValue)
     break;
 
   case MCS_binary:
-    return PyUnicode_FromStringAndSize(value, cbValue);
+    return PyBytes_FromStringAndSize(value, cbValue);
 
   default:
     break;
@@ -575,7 +575,7 @@ int API_resultRowValue(void *result, int column, UMTypeInfo *ti, char *value, si
     case MFTYPE_DOUBLE:
       {
         //FIXME: Too fucking slow
-        PyObject *sobj = PyUnicode_FromStringAndSize((char *) value, cbValue);
+        PyObject *sobj = PyBytes_FromStringAndSize((char *) value, cbValue);
         valobj = PyFloat_FromString (sobj);
         Py_DECREF(sobj);
         break;
@@ -659,7 +659,7 @@ int API_resultRowValue(void *result, int column, UMTypeInfo *ti, char *value, si
     case MFTYPE_LONG_BLOB:
     case MFTYPE_BLOB:
       if (ti->flags & MFFLAG_BINARY_FLAG) {
-        valobj = PyUnicode_FromStringAndSize( (const char *) value, cbValue);
+        valobj = PyBytes_FromStringAndSize( (const char *) value, cbValue);
       } else {
         valobj = DecodeString (ti, value, cbValue);
       }
@@ -679,7 +679,7 @@ int API_resultRowValue(void *result, int column, UMTypeInfo *ti, char *value, si
     case MFTYPE_SET:
     case MFTYPE_DECIMAL:
       // Fall through for string encoding
-      valobj = PyUnicode_FromStringAndSize( (const char *) value, cbValue);
+      valobj = PyBytes_FromStringAndSize( (const char *) value, cbValue);
       break;
 
     }
@@ -987,13 +987,13 @@ int AppendEscapedArg (Connection *self, char *start, char *end, PyObject *obj)
   if (PyUnicode_Check(obj))
   {
     PRINTMARK();
-    return AppendAndEscapeString(start, end, PyUnicode_AS_UNICODE(obj), PyUnicode_AS_UNICODE(obj) + PyUnicode_GET_SIZE(obj), TRUE);
+    return AppendAndEscapeString(start, end, PyBytes_AS_STRING(obj), PyBytes_AS_STRING(obj) + PyBytes_GET_SIZE(obj), TRUE);
   }
   else
     if (PyUnicode_Check(obj))
     {
       PRINTMARK();
-      strobj = self->PFN_PyUnicode_Encode(PyUnicode_AS_UNICODE(obj), PyUnicode_GET_SIZE(obj), NULL);
+      strobj = self->PFN_PyUnicode_Encode(PyBytes_AS_STRING(obj), PyBytes_GET_SIZE(obj), NULL);
 
       if (strobj == NULL)
       {
@@ -1007,7 +1007,7 @@ int AppendEscapedArg (Connection *self, char *start, char *end, PyObject *obj)
       }
 
 
-      ret = AppendAndEscapeString(start, end, PyUnicode_AS_UNICODE(strobj), PyUnicode_AS_UNICODE(strobj) + PyUnicode_GET_SIZE(strobj), TRUE);
+      ret = AppendAndEscapeString(start, end, PyBytes_AS_STRING(strobj), PyBytes_AS_STRING(strobj) + PyBytes_GET_SIZE(strobj), TRUE);
       Py_DECREF(strobj);
 
       return ret;
@@ -1048,7 +1048,7 @@ int AppendEscapedArg (Connection *self, char *start, char *end, PyObject *obj)
           //FIXME: Might possible to avoid this?
           PRINTMARK();
           strobj = PyObject_Str(obj);
-          ret = AppendAndEscapeString(start, end, PyUnicode_AS_UNICODE(strobj), PyUnicode_AS_UNICODE(strobj) + PyUnicode_GET_SIZE(strobj), FALSE);
+          ret = AppendAndEscapeString(start, end, PyBytes_AS_STRING(strobj), PyBytes_AS_STRING(strobj) + PyBytes_GET_SIZE(strobj), FALSE);
           Py_DECREF(strobj);
           return ret;
 }
@@ -1068,7 +1068,7 @@ PyObject *EscapeQueryArguments(Connection *self, PyObject *inQuery, PyObject *it
 
   // Estimate output length
 
-  cbOutQuery += PyUnicode_GET_SIZE(inQuery);
+  cbOutQuery += PyBytes_GET_SIZE(inQuery);
 
   iterator = PyObject_GetIter(iterable);
 
@@ -1078,11 +1078,11 @@ PyObject *EscapeQueryArguments(Connection *self, PyObject *inQuery, PyObject *it
     cbOutQuery += 2;
 
     // Worst case escape and utf-8
-    if (PyUnicode_Check(arg))
-      cbOutQuery += (PyUnicode_GET_SIZE(arg) * 2);
+    if (PyBytes_Check(arg))
+      cbOutQuery += (PyBytes_GET_SIZE(arg) * 2);
     else
-      if (PyUnicode_Check(arg))
-        cbOutQuery += (PyUnicode_GET_SIZE(arg) * 6);
+      if (PyBytes_Check(arg))
+        cbOutQuery += (PyBytes_GET_SIZE(arg) * 6);
       else
         cbOutQuery += 64;
 
@@ -1105,7 +1105,7 @@ PyObject *EscapeQueryArguments(Connection *self, PyObject *inQuery, PyObject *it
 
 
   optr = obuffer;
-  iptr = PyUnicode_AS_UNICODE(inQuery);
+  iptr = PyBytes_AS_STRING(inQuery);
 
   hasArg = 0;
 
@@ -1171,7 +1171,7 @@ PyObject *EscapeQueryArguments(Connection *self, PyObject *inQuery, PyObject *it
 END_PARSE:
   Py_DECREF(iterator);
 
-  retobj = PyUnicode_FromStringAndSize (obuffer, (optr - obuffer));
+  retobj = PyBytes_FromStringAndSize (obuffer, (optr - obuffer));
 
   if (heap)
   {
@@ -1214,15 +1214,15 @@ PyObject *Connection_query(Connection *self, PyObject *args)
     Py_DECREF(iterator);
   }
 
-  if (!PyUnicode_Check(inQuery))
+  if (!PyBytes_Check(inQuery))
   {
-    if (!PyUnicode_Check(inQuery))
+    if (!PyBytes_Check(inQuery))
     {
       PRINTMARK();
       return PyErr_Format(PyExc_TypeError, "Query argument must be either String or Unicode");
     }
 
-    query = self->PFN_PyUnicode_Encode(PyUnicode_AS_UNICODE(inQuery), PyUnicode_GET_SIZE(inQuery), NULL);
+    query = self->PFN_PyUnicode_Encode(PyBytes_AS_STRING(inQuery), PyBytes_GET_SIZE(inQuery), NULL);
 
     if (query == NULL)
     {
@@ -1263,7 +1263,7 @@ PyObject *Connection_query(Connection *self, PyObject *args)
     escapedQuery = query;
   }
 
-  ret =  UMConnection_Query(self->conn, PyUnicode_AS_UNICODE(escapedQuery), PyUnicode_GET_SIZE(escapedQuery));
+  ret =  UMConnection_Query(self->conn, PyBytes_AS_STRING(escapedQuery), PyBytes_GET_SIZE(escapedQuery));
 
   Py_DECREF(escapedQuery);
 
