@@ -984,10 +984,10 @@ int AppendEscapedArg (Connection *self, char *start, char *end, PyObject *obj)
   FIXME: Surround strings with '' could be performed in this function to avoid extra logic in AppendAndEscapeString */
   PRINTMARK();
 
-  if (PyString_Check(obj))
+  if (PyUnicode_Check(obj))
   {
     PRINTMARK();
-    return AppendAndEscapeString(start, end, PyString_AS_STRING(obj), PyString_AS_STRING(obj) + PyString_GET_SIZE(obj), TRUE);
+    return AppendAndEscapeString(start, end, PyUnicode_AS_UNICODE(obj), PyUnicode_AS_UNICODE(obj) + PyUnicode_GET_SIZE(obj), TRUE);
   }
   else
     if (PyUnicode_Check(obj))
@@ -1007,7 +1007,7 @@ int AppendEscapedArg (Connection *self, char *start, char *end, PyObject *obj)
       }
 
 
-      ret = AppendAndEscapeString(start, end, PyString_AS_STRING(strobj), PyString_AS_STRING(strobj) + PyString_GET_SIZE(strobj), TRUE);
+      ret = AppendAndEscapeString(start, end, PyUnicode_AS_UNICODE(strobj), PyUnicode_AS_UNICODE(strobj) + PyUnicode_GET_SIZE(strobj), TRUE);
       Py_DECREF(strobj);
 
       return ret;
@@ -1048,7 +1048,7 @@ int AppendEscapedArg (Connection *self, char *start, char *end, PyObject *obj)
           //FIXME: Might possible to avoid this?
           PRINTMARK();
           strobj = PyObject_Str(obj);
-          ret = AppendAndEscapeString(start, end, PyString_AS_STRING(strobj), PyString_AS_STRING(strobj) + PyString_GET_SIZE(strobj), FALSE);
+          ret = AppendAndEscapeString(start, end, PyUnicode_AS_UNICODE(strobj), PyUnicode_AS_UNICODE(strobj) + PyUnicode_GET_SIZE(strobj), FALSE);
           Py_DECREF(strobj);
           return ret;
 }
@@ -1068,7 +1068,7 @@ PyObject *EscapeQueryArguments(Connection *self, PyObject *inQuery, PyObject *it
 
   // Estimate output length
 
-  cbOutQuery += PyString_GET_SIZE(inQuery);
+  cbOutQuery += PyUnicode_GET_SIZE(inQuery);
 
   iterator = PyObject_GetIter(iterable);
 
@@ -1078,8 +1078,8 @@ PyObject *EscapeQueryArguments(Connection *self, PyObject *inQuery, PyObject *it
     cbOutQuery += 2;
 
     // Worst case escape and utf-8
-    if (PyString_Check(arg))
-      cbOutQuery += (PyString_GET_SIZE(arg) * 2);
+    if (PyUnicode_Check(arg))
+      cbOutQuery += (PyUnicode_GET_SIZE(arg) * 2);
     else
       if (PyUnicode_Check(arg))
         cbOutQuery += (PyUnicode_GET_SIZE(arg) * 6);
@@ -1105,7 +1105,7 @@ PyObject *EscapeQueryArguments(Connection *self, PyObject *inQuery, PyObject *it
 
 
   optr = obuffer;
-  iptr = PyString_AS_STRING(inQuery);
+  iptr = PyUnicode_AS_UNICODE(inQuery);
 
   hasArg = 0;
 
@@ -1214,7 +1214,7 @@ PyObject *Connection_query(Connection *self, PyObject *args)
     Py_DECREF(iterator);
   }
 
-  if (!PyString_Check(inQuery))
+  if (!PyUnicode_Check(inQuery))
   {
     if (!PyUnicode_Check(inQuery))
     {
@@ -1263,7 +1263,7 @@ PyObject *Connection_query(Connection *self, PyObject *args)
     escapedQuery = query;
   }
 
-  ret =  UMConnection_Query(self->conn, PyString_AS_STRING(escapedQuery), PyString_GET_SIZE(escapedQuery));
+  ret =  UMConnection_Query(self->conn, PyUnicode_AS_UNICODE(escapedQuery), PyUnicode_GET_SIZE(escapedQuery));
 
   Py_DECREF(escapedQuery);
 
