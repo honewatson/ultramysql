@@ -64,7 +64,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <datetime.h>
 #include <stdlib.h>
-
+#if PY_MAJOR_VERSION >= 3
+#define IS_PY3K
+#endif
 #ifndef TRUE
 #define TRUE 1
 #endif
@@ -146,8 +148,8 @@ void *API_createResult(int columns)
 void API_resultSetField(void *result, int column, UMTypeInfo *ti, void *_name, size_t _cbName)
 {
   PyObject *field = PyTuple_New(2);
-  PyTuple_SET_ITEM(field, 0, PyString_FromStringAndSize((const char *)_name, _cbName));
-  PyTuple_SET_ITEM(field, 1, PyInt_FromLong(ti->type));
+  PyTuple_SET_ITEM(field, 0, PyUnicode_FromStringAndSize((const char *)_name, _cbName));
+  PyTuple_SET_ITEM(field, 1, PyLong_FromLong(ti->type));
   PyTuple_SET_ITEM(((ResultSet *) result)->fields, column, field);
   PRINTMARK();
   return;
@@ -506,7 +508,7 @@ static PyObject *DecodeString (UMTypeInfo *ti, char *value, size_t cbValue)
     break;
 
   case MCS_binary:
-    return PyString_FromStringAndSize(value, cbValue);
+    return PyUnicode_FromStringAndSize(value, cbValue);
 
   default:
     break;
@@ -553,7 +555,7 @@ int API_resultRowValue(void *result, int column, UMTypeInfo *ti, char *value, si
     case MFTYPE_SHORT:
     case MFTYPE_INT24:
       {
-        valobj = PyInt_FromLong(parseINT32 (value, ((char *) value) + cbValue));
+        valobj = PyLong_FromLong(parseINT32 (value, ((char *) value) + cbValue));
         break;
       }
 
@@ -573,8 +575,8 @@ int API_resultRowValue(void *result, int column, UMTypeInfo *ti, char *value, si
     case MFTYPE_DOUBLE:
       {
         //FIXME: Too fucking slow
-        PyObject *sobj = PyString_FromStringAndSize((char *) value, cbValue);
-        valobj = PyFloat_FromString (sobj, NULL);
+        PyObject *sobj = PyUnicode_FromStringAndSize((char *) value, cbValue);
+        valobj = PyFloat_FromString (sobj);
         Py_DECREF(sobj);
         break;
       }
@@ -657,7 +659,7 @@ int API_resultRowValue(void *result, int column, UMTypeInfo *ti, char *value, si
     case MFTYPE_LONG_BLOB:
     case MFTYPE_BLOB:
       if (ti->flags & MFFLAG_BINARY_FLAG) {
-        valobj = PyString_FromStringAndSize( (const char *) value, cbValue);
+        valobj = PyUnicode_FromStringAndSize( (const char *) value, cbValue);
       } else {
         valobj = DecodeString (ti, value, cbValue);
       }
@@ -677,7 +679,7 @@ int API_resultRowValue(void *result, int column, UMTypeInfo *ti, char *value, si
     case MFTYPE_SET:
     case MFTYPE_DECIMAL:
       // Fall through for string encoding
-      valobj = PyString_FromStringAndSize( (const char *) value, cbValue);
+      valobj = PyUnicode_FromStringAndSize( (const char *) value, cbValue);
       break;
 
     }
@@ -1169,7 +1171,7 @@ PyObject *EscapeQueryArguments(Connection *self, PyObject *inQuery, PyObject *it
 END_PARSE:
   Py_DECREF(iterator);
 
-  retobj = PyString_FromStringAndSize (obuffer, (optr - obuffer));
+  retobj = PyUnicode_FromStringAndSize (obuffer, (optr - obuffer));
 
   if (heap)
   {
@@ -1314,8 +1316,7 @@ static PyMemberDef Connection_members[] = {
 
 
 static PyTypeObject ConnectionType = { 
-  PyObject_HEAD_INIT(NULL)
-  0,				/* ob_size        */
+  PyVarObject_HEAD_INIT(NULL, 0)				/* ob_size        */
   "umysql.Connection",		/* tp_name        */
   sizeof(Connection),		/* tp_basicsize   */
   0,				/* tp_itemsize    */
@@ -1410,8 +1411,7 @@ static PyMemberDef ResultSet_members[] = {
 };
 
 static PyTypeObject ResultSetType = { 
-  PyObject_HEAD_INIT(NULL)
-  0,				/* ob_size        */
+  PyVarObject_HEAD_INIT(NULL, 0)				/* ob_size        */
   "umysql.ResultSet",		/* tp_name        */
   sizeof(ResultSet),		/* tp_basicsize   */
   0,				/* tp_itemsize    */
@@ -1452,7 +1452,19 @@ static PyTypeObject ResultSetType = {
 static PyMethodDef methods[] = {
   {NULL, NULL, 0, NULL}        /* Sentinel */
 };
-
+#if PY_MAJOR_VERSION >= 3
+    static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "umysql",     /* m_name */
+        "Fast MySql Client",  /* m_doc */
+        -1,                  /* m_size */
+        methods,    /* m_methods */
+        NULL,                /* m_reload */
+        NULL,                /* m_traverse */
+        NULL,                /* m_clear */
+        NULL,                /* m_free */
+    };
+#endif
 PyMODINIT_FUNC
   initumysql(void) 
 {
@@ -1460,7 +1472,7 @@ PyMODINIT_FUNC
   PyObject *dict;
   PyDateTime_IMPORT;
 
-  m = Py_InitModule3("umysql", methods, "");
+  m = PyModule_Create(&moduledef);
   if (m == NULL)
     return;
 
@@ -1478,7 +1490,7 @@ PyMODINIT_FUNC
   Py_INCREF(&ResultSetType);
   PyModule_AddObject(m, "ResultSet", (PyObject *)&ResultSetType);
 
-  umysql_Error = PyErr_NewException("umysql.Error", PyExc_StandardError, NULL);
+  umysql_Error = PyErr_NewException("umysql.Error", PyExc_Exception, NULL);
   umysql_SQLError = PyErr_NewException("umysql.SQLError", umysql_Error, NULL);
 
   PyDict_SetItemString(dict, "Error", umysql_Error);
