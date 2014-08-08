@@ -1452,21 +1452,21 @@ static PyTypeObject ResultSetType = {
 static PyMethodDef methods[] = {
   {NULL, NULL, 0, NULL}        /* Sentinel */
 };
-#if PY_MAJOR_VERSION >= 3
-    static struct PyModuleDef moduledef = {
-        PyModuleDef_HEAD_INIT,
-        "umysql",     /* m_name */
-        "Fast MySql Client",  /* m_doc */
-        -1,                  /* m_size */
-        methods,    /* m_methods */
-        NULL,                /* m_reload */
-        NULL,                /* m_traverse */
-        NULL,                /* m_clear */
-        NULL,                /* m_free */
-    };
-#endif
+
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "umysql",     /* m_name */
+    "Fast MySql Client",  /* m_doc */
+    -1,                  /* m_size */
+    methods,    /* m_methods */
+    NULL,                /* m_reload */
+    NULL,                /* m_traverse */
+    NULL,                /* m_clear */
+    NULL,                /* m_free */
+};
+
 PyMODINIT_FUNC
-  initumysql(void) 
+  PyInit_umysql(void)
 {
   PyObject* m;
   PyObject *dict;
@@ -1474,19 +1474,19 @@ PyMODINIT_FUNC
 
   m = PyModule_Create(&moduledef);
   if (m == NULL)
-    return;
+    return NULL;
 
   dict = PyModule_GetDict(m);
 
   ConnectionType.tp_new = PyType_GenericNew;
   if (PyType_Ready(&ConnectionType) < 0)
-    return;
+    return NULL;
   Py_INCREF(&ConnectionType);
   PyModule_AddObject(m, "Connection", (PyObject *)&ConnectionType);
 
   ResultSetType.tp_new = PyType_GenericNew;
   if (PyType_Ready(&ResultSetType) < 0)
-    return;
+    return NULL;
   Py_INCREF(&ResultSetType);
   PyModule_AddObject(m, "ResultSet", (PyObject *)&ResultSetType);
 
@@ -1495,4 +1495,5 @@ PyMODINIT_FUNC
 
   PyDict_SetItemString(dict, "Error", umysql_Error);
   PyDict_SetItemString(dict, "SQLError", umysql_SQLError);
+  return m;
 }
